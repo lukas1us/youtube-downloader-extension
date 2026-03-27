@@ -1,0 +1,12 @@
+services:
+  yt-downloader:
+    build: ./server
+    ports:
+      - "127.0.0.1:3333:3333"   # only accessible from localhost
+    volumes:
+      - "${HOME}/Downloads:/downloads"
+      - "${HOME}/Documents/Music/ytb-downloader:/music"
+    environment:
+      - DOWNLOAD_DIR_VIDEO=/downloads
+      - DOWNLOAD_DIR_AUDIO=/music
+    restart: always              # auto-start when Docker Desktop launches
