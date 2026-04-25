@@ -1,10 +1,16 @@
 {
   "manifest_version": 3,
   "name": "YT Downloader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Stahuj YouTube videa přes lokální yt-dlp server.",
   "permissions": ["tabs"],
   "host_permissions": ["http://localhost:3333/*"],
+  "web_accessible_resources": [
+    {
+      "resources": ["trimmer.html", "trimmer.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

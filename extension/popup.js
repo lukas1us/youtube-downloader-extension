@@ -61,8 +61,8 @@ function showDownloadUI(url, title) {
     label.textContent = toggle.checked ? 'Celý playlist' : 'Jen toto video';
   });
 
-  document.getElementById('btn-mp4').addEventListener('click', () => startDownload(url, 'mp4'));
-  document.getElementById('btn-mp3').addEventListener('click', () => startDownload(url, 'mp3'));
+  document.getElementById('btn-mp4').addEventListener('click', () => startDownload(url, 'mp4', title));
+  document.getElementById('btn-mp3').addEventListener('click', () => startDownload(url, 'mp3', title));
 }
 
 // ── Progress bar helpers ─────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ function clearProgressBar() {
 
 // ── Download flow ────────────────────────────────────────────────────────────
 
-async function startDownload(url, format) {
+async function startDownload(url, format, title) {
   const btnMp4   = document.getElementById('btn-mp4');
   const btnMp3   = document.getElementById('btn-mp3');
   const statusEl = document.getElementById('status');
@@ -171,6 +171,18 @@ async function startDownload(url, format) {
       clearProgressBar();
       statusEl.className = 'status success';
       statusEl.textContent = '✓ ' + (event.filename || 'Uloženo do ~/Downloads');
+
+      if (format === 'mp3' && event.filename) {
+        const trimBtn = document.createElement('button');
+        trimBtn.className = 'btn btn-mp3';
+        trimBtn.style.cssText = 'margin-top: 10px; width: 100%;';
+        trimBtn.textContent = '✂ Trimovat audio';
+        trimBtn.addEventListener('click', () => {
+          const p = new URLSearchParams({ file: event.filename, title: title || '' });
+          chrome.tabs.create({ url: chrome.runtime.getURL('trimmer.html') + '?' + p });
+        });
+        statusEl.insertAdjacentElement('afterend', trimBtn);
+      }
 
     } else if (event.type === 'error') {
       es.close();

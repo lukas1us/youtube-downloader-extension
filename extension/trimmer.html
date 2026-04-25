@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <title>Audio Trimmer – YT Downloader</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-width: 700px;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+      font-size: 13px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 13px 20px 11px;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    .logo {
+      width: 22px;
+      height: 22px;
+      background: #ff0000;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .logo svg { display: block; }
+    .header h1 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.01em;
+    }
+
+    .content {
+      padding: 20px 24px 28px;
+    }
+
+    .video-title {
+      font-size: 13px;
+      color: #bbb;
+      margin-bottom: 18px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .wave-wrap {
+      position: relative;
+      background: #1a1a1a;
+      border-radius: 6px;
+      border: 1px solid #2a2a2a;
+      overflow: hidden;
+      height: 108px;
+    }
+    #waveform {
+      width: 100%;
+      height: 100px;
+    }
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: #555;
+      font-size: 12px;
+      background: #1a1a1a;
+      z-index: 2;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 13px;
+      height: 13px;
+      border: 2px solid #333;
+      border-top-color: #aaa;
+      border-radius: 50%;
+      animation: spin 0.55s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .time-row {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin: 14px 0 16px;
+    }
+    .time-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .time-field label {
+      font-size: 12px;
+      color: #666;
+    }
+    .time-field input[type=number] {
+      width: 90px;
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 5px;
+      color: #e0e0e0;
+      padding: 5px 8px;
+      font-size: 13px;
+      font-family: 'SF Mono', Menlo, monospace;
+      outline: none;
+      appearance: textfield;
+    }
+    .time-field input[type=number]:focus { border-color: #555; }
+    .time-field input[type=number]::-webkit-outer-spin-button,
+    .time-field input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .btn {
+      padding: 9px 16px;
+      border: none;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      letter-spacing: 0.01em;
+    }
+    .btn:active:not(:disabled) { transform: scale(0.96); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-mp3 { background: #1e1e1e; color: #ccc; border: 1px solid #333; }
+    .btn-mp3:hover:not(:disabled) { background: #272727; }
+
+    .btn-save {
+      background: #1a3a1a;
+      color: #4caf50;
+      border: 1px solid #2a4a2a;
+      margin-left: auto;
+    }
+    .btn-save:hover:not(:disabled) { background: #1f451f; }
+
+    .status {
+      margin-top: 14px;
+      font-size: 12px;
+      min-height: 18px;
+      line-height: 1.5;
+    }
+    .status.success { color: #4caf50; }
+    .status.error   { color: #f44336; }
+    .status.loading { color: #777; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
+        <polygon points="3,1.5 9,5 3,8.5" fill="white"/>
+      </svg>
+    </div>
+    <h1>✂ Audio Trimmer</h1>
+  </div>
+
+  <div class="content">
+    <div class="video-title" id="video-title"></div>
+
+    <div class="wave-wrap">
+      <div id="loading-overlay"><span class="spinner"></span>Načítám audio…</div>
+      <div id="waveform"></div>
+    </div>
+
+    <div class="time-row">
+      <div class="time-field">
+        <label for="inp-start">Start (s)</label>
+        <input type="number" id="inp-start" min="0" step="0.01" value="0.00">
+      </div>
+      <div class="time-field">
+        <label for="inp-end">Konec (s)</label>
+        <input type="number" id="inp-end" min="0" step="0.01" value="0.00">
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="btn btn-mp3" id="btn-play-pause" disabled>▶ Play</button>
+      <button class="btn btn-mp3" id="btn-play-region" disabled>▶ Play výběr</button>
+      <button class="btn btn-save" id="btn-save" disabled>✂ Uložit výběr</button>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <script src="vendor/wavesurfer.min.js"></script>
+  <script src="vendor/wavesurfer.regions.min.js"></script>
+  <script src="trimmer.js"></script>
+</body>
+</html>

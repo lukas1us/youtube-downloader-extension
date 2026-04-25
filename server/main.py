@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -18,6 +18,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Range", "Accept-Ranges"],
 )
 
 # Output dirs — override via env vars when running in Docker
@@ -208,3 +209,65 @@ async def progress(job_id: str, request: Request):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@app.get("/file")
+async def get_file(name: str):
+    audio_dir = Path(DIR_AUDIO).resolve()
+    filepath = (audio_dir / name).resolve()
+    if not str(filepath).startswith(str(audio_dir) + os.sep) and filepath != audio_dir:
+        return Response(status_code=400, content="Invalid filename")
+    if not filepath.exists() or not filepath.is_file():
+        return Response(status_code=404, content="File not found")
+    return FileResponse(str(filepath), media_type="audio/mpeg")
+
+
+class TrimRequest(BaseModel):
+    filename: str
+    start: float
+    end: float
+
+
+@app.post("/trim")
+async def trim_audio(req: TrimRequest):
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return {"ok": False, "error": "ffmpeg není dostupné — v Docker obrazu je zahrnuté, na macOS: brew install ffmpeg"}
+
+    audio_dir = Path(DIR_AUDIO).resolve()
+    input_path = (audio_dir / req.filename).resolve()
+
+    if not str(input_path).startswith(str(audio_dir) + os.sep):
+        return {"ok": False, "error": "Neplatný název souboru"}
+
+    if not input_path.exists() or not input_path.is_file():
+        return {"ok": False, "error": f"Soubor neexistuje: {req.filename}"}
+
+    start_int = round(req.start)
+    end_int   = round(req.end)
+    output_name = f"{input_path.stem}_trim_{start_int}s-{end_int}s.mp3"
+    output_path = audio_dir / output_name
+
+    cmd = [
+        ffmpeg, "-y",
+        "-i", str(input_path),
+        "-ss", str(req.start),
+        "-to", str(req.end),
+        "-c", "copy",
+        str(output_path),
+    ]
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await proc.communicate()
+
+        if proc.returncode == 0:
+            return {"ok": True, "filename": output_name}
+        else:
+            return {"ok": False, "error": f"ffmpeg selhalo s kódem {proc.returncode}"}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
